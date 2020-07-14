@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ChoregrapheProject xmlns="http://www.ald.softbankrobotics.com/schema/choregraphe/project.xsd" xar_version="3">
+  <Box name="root" id="-1" localization="8" tooltip="Root box of Choregraphe&apos;s behavior. Highest level possible." x="0" y="0">
+    <bitmap>media/images/box/root.png</bitmap>
+    <script language="4">
+      <content>
+        <![CDATA[]]>
+      </content>
+    </script>
+    <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+    <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+    <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+    <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="指令盒行为结束时，送出信号。" id="4" />
+    <Timeline enable="0">
+      <BehaviorLayer name="behavior_layer1">
+        <BehaviorKeyframe name="keyframe1" index="1">
+          <Diagram>
+            <Box name="SocektRecieve" id="1" localization="8" tooltip="" x="363" y="323">
+              <bitmap>media/images/box/box-python-script.png</bitmap>
+              <script language="4">
+                <content>
+                  <![CDATA[import socket
+import sys
+import time
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.motionProxy = ALProxy("ALMotion")
+        self.tts = ALProxy("ALTextToSpeech")
+        self.COMMAND_FORWARD = 'FORWARD'
+        self.LISTEN_PORT = 8003 # 服务器监听端口
+        self.ROBOT_IP = '192.168.43.253'#设置为第二棒机器人的IP地址
+
+    def onLoad(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.bind((self.ROBOT_IP, self.LISTEN_PORT))
+        self.sock.listen(10)
+        pass
+
+    def onUnload(self):
+
+        #put clean-up code here
+        pass
+
+    def onInput_onStart(self):
+        while True:    # 等待客户端连接，单线程监听单一客户端
+            connection,address = self.sock.accept()
+            # 服务器接受指令
+            buf = connection.recv(1024)
+            print "get:[", buf, "]"
+            if buf == self.COMMAND_FORWARD:
+                self.tts.say("收到")
+                break
+        connection.close()    # 关闭当前socket连接
+        self.sock.close() # 与服务器端断开socket连接
+        self.onStopped() #activate the output of the box
+        pass
+
+    def onInput_onStop(self):
+        self.onUnload() #it is recommended to reuse the clean-up as the box is stopped
+        self.onStopped() #activate the output of the box]]>
+                </content>
+              </script>
+              <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+              <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+              <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+              <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="指令盒行为结束时，送出信号。" id="4" />
+            </Box>
+            <Box name="Walk" id="2" localization="8" tooltip="" x="631" y="306">
+              <bitmap>media/images/box/box-python-script.png</bitmap>
+              <script language="4">
+                <content>
+                  <![CDATA[# -*- encoding: UTF-8 -*-
+import cv2
+import numpy as np  # 用np访问numpy包
+import math
+from PIL import Image
+import vision_definitions
+import time
+
+
+class MyClass(GeneratedClass):
+    def __init__(self):
+        GeneratedClass.__init__(self)
+        self.motionProxy = ALProxy("ALMotion")
+        self.postureProxy = ALProxy("ALRobotPosture")
+        self.camProxy = ALProxy("ALVideoDevice")
+        self.tts=ALProxy("ALTextToSpeech")
+
+    def onLoad(self):
+        # put initialization code here
+        pass
+
+    def onUnload(self):
+        pass
+
+    def onInput_onStart(self):
+        i = 0
+        # 步态设置
+        startstepx = 0.06
+        maxstepx = 0.07
+
+        maxstepy = 0.101
+        maxsteptheta = 0.349
+        startstepfrequency = 0.5
+        maxstepfrequency = 0.6
+        startstepheight = 0.015
+        stepheight = 0.020
+
+        torsowx = 0.0
+        torsowy = 0.012
+        startmoveConfig = [["MaxStepX", startstepx],
+                  ["MaxStepY", maxstepy],
+                  ["MaxStepTheta", maxsteptheta],
+                  ["MaxStepFrequency", startstepfrequency],
+                  ["StepHeight", startstepheight],
+                  ["TorsoWx", torsowx],
+                  ["TorsoWy", torsowy]]
+        moveConfigF = [["MaxStepX", maxstepx],
+                  ["MaxStepY", maxstepy],
+                  ["MaxStepTheta", maxsteptheta],
+                  ["MaxStepFrequency", maxstepfrequency],
+                  ["StepHeight", stepheight],
+                  ["TorsoWx", torsowx],
+                  ["TorsoWy", torsowy]]
+        self.postureProxy.goToPosture("StandInit", 0.5)
+        self.motionProxy.moveInit()
+        time.sleep(0.5)
+        # self.motionProxy.angleInterpolation('HeadPitch',10*math.pi/180.0,0.8,False)
+        self.motionProxy.setAngles(
+            'HeadPitch', 5*math.pi/180.0, 0.5)  # 角度 = 5
+        # almotion_init_setAngles()
+        # almotion_init_setAngles()
+        self.camProxy.setActiveCamera(1)  # 0 is up camera   choose down camera
+        # Register a Generic Video Module
+        resolution = vision_definitions.kQVGA  # 分辨率
+        colorSpace = vision_definitions.kBGRColorSpace  # 色彩空间 RGB
+        fps = 30  # 帧率30fps
+        # dingyue shexiangji
+        nameId = self.camProxy.subscribe(
+            "python_GVM", resolution, colorSpace, fps)
+        # 设置曝光度模式
+        self.camProxy.setCamerasParameter(nameId, 22, 2)
+        print 'getting images in remote'
+
+        x = []
+        y = []
+        #stiffness = 1
+        # f=open(r'tt.txt','a')
+        robotPosition = self.motionProxy.getRobotPosition(0)
+        n = robotPosition[2]
+        currentPosition = [0, 0, 0]
+
+        while (1):
+            # 获取机器人位置坐标，计算里程
+            robotNewPosition = self.motionProxy.getRobotPosition(0)
+            currentPosition[0] = ((robotNewPosition[0]-robotPosition[0])*100)*math.cos(
+                n)+((robotNewPosition[1]-robotPosition[1])*100)*math.sin(n)
+            currentPosition[1] = ((robotNewPosition[1]-robotPosition[1])*100)*math.cos(
+                n)-((robotNewPosition[0]-robotPosition[0])*100)*math.sin(n)
+            currentPosition[2] = (robotNewPosition[2]-robotPosition[2])*57.32
+            # f.write(str(currentPosition)+'\n')
+            # f.close
+            x.append(currentPosition[0])
+            y.append(currentPosition[1])
+            print"currentPosition is :"
+            print currentPosition
+            ##########################
+            i = i + 1
+            if(i<90):
+                moveConfig=startmoveConfig
+            else:
+                moveConfig=moveConfigF
+            print "getting image " + str(i)
+            naoImage = self.camProxy.getImageRemote(nameId)
+
+            imageWidth = naoImage[0]  # width
+            imageHeight = naoImage[1]  # height
+            # binary array of size height * width * nblayers(number of layers) containing image data.
+            array = naoImage[6]
+
+            im = Image.frombytes("RGB", (imageWidth, imageHeight), array)
+            # 将比特信息转化为numpy.int64数据类型
+            frame = np.asarray(im)
+            # 对读取的图像矩阵进行计算，计算白线位置
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)    # 将RGB色域转化为HSV色域
+            lowera = np.array([0, 0, 180])
+            uppera = np.array([180, 30, 255])
+            # #lower20=>0,upper200=>0，lower～upper=>255
+            mask1 = cv2.inRange(hsv, lowera, uppera)
+            kernel = np.ones((3, 3), np.uint8)
+            mask = cv2.morphologyEx(mask1, cv2.MORPH_CLOSE, kernel)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+            newlines = cv2.HoughLines(mask, 1, np.pi/180, 80)
+            if newlines == None:
+                print "NO LINE"
+                newlines1 = [[0, 0]]
+            else:
+                newlines1 = newlines[:, 0, :]
+                # newlines1 = newlines[0]
+            single_line_value = newlines1[0]
+            # single_line_value = CalculateCenterOfWhiteLine(frame)
+            # print "single_line_value:",single_line_value
+
+            if single_line_value[0] != 0:
+                #self.tts.say("yes")
+                # motionProxy.move(0.1,0,0,moveConfig)
+                if single_line_value[1] <= 1.05:
+                    if single_line_value[1]>=0.52:
+                        print "turn left"
+                        # 左转前进
+                        self.motionProxy.move(0.3, 0, -0.1, moveConfig)
+                    else:
+                        print "turn left"
+                        # 左转前进
+                        self.motionProxy.move(0.3, 0, -0.2, moveConfig)
+                elif single_line_value[1] >= 2.09:
+                    if single_line_value[1]<=2.52:
+                        print "turn left"
+                        # 左转前进
+                        self.motionProxy.move(0.3, 0, 0.1, moveConfig)
+                    else:
+                        print "turn left"
+                        # 左转前进
+                        self.motionProxy.move(0.3, 0, 0.2, moveConfig)
+                else:
+                    print "mindle"
+                    # 识别到终点直线
+                    if single_line_value[1] <= 1.57 and single_line_value[1] > 1.04:
+                        self.motionProxy.move(0.3, 0, 0.2, moveConfig)
+                    if single_line_value[1] <= 2.09 and single_line_value[1] > 1.57:
+                        self.motionProxy.move(0.3, 0, -0.2, moveConfig)
+                    # motionProxy.move(0.3,0.0,0.0,moveConfig)
+            else:
+                self.tts.say("no line")
+                if currentPosition[0] <= 110:
+                    self.motionProxy.move(0.1, 0.0, 0.0, moveConfig)
+                else:
+                    self.motionProxy.move(0.0, 0.0, 0.0, moveConfig)
+                    self.motionProxy.rest()
+                    break
+
+        self.camProxy.unsubscribe(nameId)
+        print "camProxy has unsubscribe"
+        self.onStopped()  # activate the output of the box
+        pass
+
+    def onInput_onStop(self):
+        self.onUnload()  # it is recommended to reuse the clean-up as the box is stopped
+        self.onStopped()  # activate the output of the box]]>
+                </content>
+              </script>
+              <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
+              <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
+              <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
+              <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="指令盒行为结束时，送出信号。" id="4" />
+            </Box>
+            <Link inputowner="1" indexofinput="2" outputowner="0" indexofoutput="2" />
+            <Link inputowner="2" indexofinput="2" outputowner="1" indexofoutput="4" />
+            <Link inputowner="0" indexofinput="4" outputowner="2" indexofoutput="4" />
+          </Diagram>
+        </BehaviorKeyframe>
+      </BehaviorLayer>
+    </Timeline>
+  </Box>
+</ChoregrapheProject>
